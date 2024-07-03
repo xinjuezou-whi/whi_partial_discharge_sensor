@@ -1,0 +1,9 @@
+whi_partial_discharge_sensor:
+  hardware: socket
+  modbusTCP:
+    addr: 192.168.88.1
+    port: 8000
+    device_addr: 1
+  socket:
+    addr: 192.168.88.1
+    port: 8000
