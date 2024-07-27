@@ -32,7 +32,7 @@ void signalHandler(int Signal)
 int main(int argc, char** argv)
 {
 	/// node version and copyright announcement
-	std::cout << "\nWHI partial discharge sensor VERSION 00.02.1" << std::endl;
+	std::cout << "\nWHI partial discharge sensor VERSION 00.02.2" << std::endl;
 	std::cout << "Copyright © 2024-2025 Wheel Hub Intelligent Co.,Ltd. All rights reserved\n" << std::endl;
 
 	/// ros infrastructure

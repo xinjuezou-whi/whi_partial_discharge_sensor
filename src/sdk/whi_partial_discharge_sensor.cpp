@@ -112,29 +112,20 @@ namespace whi_partial_discharge_sensor
                     translated.push_back(channelTranslated);
                 }
 
-                Res.tev.peak = translated[0][0];
-                Res.tev.average = translated[0][1];
-                Res.tev.noise = translated[0][2];
-                Res.tev.phase = translated[0][3];
-                Res.tev.count = int(translated[0][4]);
-                Res.tev.cycle_count = int(translated[0][5]);
-                Res.tev.state = uint8_t(translated[0][6]);                
-                
-                Res.aa.peak = translated[1][0];
-                Res.aa.average = translated[1][1];
-                Res.aa.noise = translated[1][2];
-                Res.aa.phase = translated[1][3];
-                Res.aa.count = int(translated[1][4]);
-                Res.aa.cycle_count = int(translated[1][5]);
-                Res.aa.state = uint8_t(translated[1][6]);    
-                
-                Res.uhf.peak = translated[2][0];
-                Res.uhf.average = translated[2][1];
-                Res.uhf.noise = translated[2][2];
-                Res.uhf.phase = translated[2][3];
-                Res.uhf.count = int(translated[2][4]);
-                Res.uhf.cycle_count = int(translated[2][5]);
-                Res.uhf.state = uint8_t(translated[2][6]);    
+                for (int i = 0; i < translated.size(); ++i)
+                {
+                    whi_interfaces::WhiPartialDischarge channel;
+                    channel.channel = uint8_t(i);
+                    channel.peak = translated[i][0];
+                    channel.average = translated[i][1];
+                    channel.noise = translated[i][2];
+                    channel.phase = translated[i][3];
+                    channel.count = int(translated[i][4]);
+                    channel.cycle_count = int(translated[i][5]);
+                    channel.state = uint8_t(translated[i][6]);       
+
+                    Res.data.push_back(channel);
+                }
             
                 return true;
             }
