@@ -75,7 +75,7 @@ namespace whi_partial_discharge_sensor
         close();
     }
 
-    std::vector<uint8_t> ModbusSensor::readChannel(int Channel)
+    std::vector<uint8_t> ModbusSensor::readChannel(int ReadLength, int Channel)
     {
         if (handle_ != nullptr)
         {
@@ -94,15 +94,10 @@ namespace whi_partial_discharge_sensor
             int rc = modbus_write_bits(handle_, device_addr_, data.size(), data.data());
             if (rc > 0)
             {
-                uint8_t read[23] = { 0 };
+                uint8_t read[ReadLength] = { 0 };
                 rc = modbus_read_bits(handle_, device_addr_, sizeof(read), read);
                 if (rc > 0)
                 {
-                    std::vector<uint8_t> resData;
-                    for (const auto& it : read)
-                    {
-                        resData.push_back(it);
-                    }
 #ifdef DEBUG
                     std::cout << "reading data:" << std::endl;
                     for (const auto& it : read)
@@ -111,29 +106,43 @@ namespace whi_partial_discharge_sensor
                     }
                     std::cout << std::dec << " with size " << sizeof(read) << std::endl;
 #endif
+                    crc = crc16(read, ReadLength - 2);
+                    if (uint8_t(crc) == read[ReadLength - 2] && uint8_t(crc >> 8) == read[ReadLength - 1])
+                    {
+                        std::vector<uint8_t> resData;
+                        for (const auto& it : read)
+                        {
+                            resData.push_back(it);
+                        }
 
-                    return resData;
+                        return resData;
+                    }
+                    else
+                    {
+                        printf((std::string(YELLOW) + "[warn]: got mismet crc code\n" + CLEANUP).c_str());
+                        return std::vector<uint8_t>();
+                    }
                 }
                 else
                 {
-                    printf((std::string(LIGHT_RED) + "[error]: failed to read" + CLEANUP).c_str());
+                    printf((std::string(LIGHT_RED) + "[error]: failed to read\n" + CLEANUP).c_str());
                 }
             }
             else
             {
-                printf((std::string(LIGHT_RED) + "[error]: failed to write" + CLEANUP).c_str());
+                printf((std::string(LIGHT_RED) + "[error]: failed to write\n" + CLEANUP).c_str());
             }
         }
 
         return std::vector<uint8_t>();
     }
 
-    std::map<int, std::vector<uint8_t>> ModbusSensor::readChannels()
+    std::map<int, std::vector<uint8_t>> ModbusSensor::readChannels(int ReadLength)
     {
         std::map<int, std::vector<uint8_t>> resData;
         for (int i = 0; i < 3; ++i)
         {
-            resData[i] = readChannel(i);
+            resData[i] = readChannel(ReadLength, i);
         }
 
         return resData;

@@ -29,8 +29,8 @@ namespace whi_partial_discharge_sensor
         virtual ~BaseSensor() = default;
 
     public:
-        virtual std::vector<uint8_t> readChannel(int Channel) = 0;
-        virtual std::map<int, std::vector<uint8_t>> readChannels() = 0;
+        virtual std::vector<uint8_t> readChannel(int ReadLength, int Channel) = 0;
+        virtual std::map<int, std::vector<uint8_t>> readChannels(int ReadLength) = 0;
         virtual void close() = 0;
     };
 } // namespace whi_rc_bridge

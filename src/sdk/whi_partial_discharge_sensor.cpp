@@ -17,6 +17,14 @@ All text above must be included in any redistribution.
 
 namespace whi_partial_discharge_sensor
 {
+    static float convertIeee754ToDecimal(uint32_t Raw)
+    {
+        float sign = Raw >> 31 == 0 ? 1.0 : -1.0;
+        uint32_t mantissa = (Raw & 0x7FFFFF) | 0x800000;
+        int32_t exp = ((Raw >> 23) & 0xFF) - 127 - 23;
+        return sign * mantissa * pow(2.0, exp);
+    }
+
     PartialDischarge::PartialDischarge(std::shared_ptr<ros::NodeHandle>& NodeHandle)
         : node_handle_(NodeHandle)
     {
@@ -25,7 +33,10 @@ namespace whi_partial_discharge_sensor
 
     PartialDischarge::~PartialDischarge()
     {
-
+        if (sensor_)
+        {
+            sensor_->close();
+        }
     }
 
     void PartialDischarge::init()
@@ -33,16 +44,11 @@ namespace whi_partial_discharge_sensor
         // params
         double frequency = 10.0;
         node_handle_->param("frequency", frequency, 10.0);
+        node_handle_->param("data_length", read_length_, 0);
         std::string hardwareStr;
 		node_handle_->param("hardware", hardwareStr, std::string(hardware[HARDWARE_MODBUS_TCP]));
 
-        // // twist publisher
-        // std::string topicTwist;
-        // node_handle_->param("whi_rc_bridge/twist_topic", topicTwist, std::string("cmd_vel"));
-        // pub_twist_ = std::make_unique<ros::Publisher>(
-        //     node_handle_->advertise<geometry_msgs::Twist>(topicTwist, 50));
-
-        // bridge instance
+        // instance
         if (hardwareStr == hardware[HARDWARE_MODBUS_TCP])
         {
             std::string addr;
@@ -77,14 +83,65 @@ namespace whi_partial_discharge_sensor
 		elapsed_time_ = ros::Duration(Event.current_real - Event.last_real);
     }
 
-    bool PartialDischarge::onServiceRead(whi_interfaces::WhiSrvRead::Request& Req,
-        whi_interfaces::WhiSrvRead::Response& Res)
+    bool PartialDischarge::onServiceRead(whi_interfaces::WhiSrvReadDischarge::Request& Req,
+        whi_interfaces::WhiSrvReadDischarge::Response& Res)
     {
         if (sensor_)
         {
-            Res.data = sensor_->readChannel(Req.addr);
+            auto data = sensor_->readChannel(read_length_, Req.addr);
+            if (!data.empty())
+            {
+#ifdef DEBUG
+                std::cout << "returned data:" << std::endl;
+                for (const auto& it : data)
+                {
+                    std::cout << std::hex << int(it) << ",";
+                }
+                std::cout << std::dec << " with size " << sizeof(data) << std::endl;
+#endif
 
-            return true;
+                std::vector<std::array<float, 7>> translated;
+                for (int i = 3; i < read_length_; i = i + 28)
+                {
+                    std::array<float, 7> channelTranslated;
+                    for (int j = 0; j < channelTranslated.size(); ++j)
+                    {
+                        channelTranslated[j] = convertIeee754ToDecimal(uint32_t(
+                            data[i + j * 4] << 24 | data[i + j * 4 + 1] << 16 | data[i + j * 4 + 2] << 8 | data[i + j * 4 + 3]));
+                    }
+                    translated.push_back(channelTranslated);
+                }
+
+                Res.tev.peak = translated[0][0];
+                Res.tev.average = translated[0][1];
+                Res.tev.noise = translated[0][2];
+                Res.tev.phase = translated[0][3];
+                Res.tev.count = int(translated[0][4]);
+                Res.tev.cycle_count = int(translated[0][5]);
+                Res.tev.state = uint8_t(translated[0][6]);                
+                
+                Res.aa.peak = translated[1][0];
+                Res.aa.average = translated[1][1];
+                Res.aa.noise = translated[1][2];
+                Res.aa.phase = translated[1][3];
+                Res.aa.count = int(translated[1][4]);
+                Res.aa.cycle_count = int(translated[1][5]);
+                Res.aa.state = uint8_t(translated[1][6]);    
+                
+                Res.uhf.peak = translated[2][0];
+                Res.uhf.average = translated[2][1];
+                Res.uhf.noise = translated[2][2];
+                Res.uhf.phase = translated[2][3];
+                Res.uhf.count = int(translated[2][4]);
+                Res.uhf.cycle_count = int(translated[2][5]);
+                Res.uhf.state = uint8_t(translated[2][6]);    
+            
+                return true;
+            }
+            else
+            {
+                return false;
+            }
         }
         else
         {

@@ -18,7 +18,7 @@ Changelog:
 #include <ros/ros.h>
 
 #include "whi_partial_discharge_sensor/sensor_base.h"
-#include "whi_interfaces/WhiSrvRead.h"
+#include "whi_interfaces/WhiSrvReadDischarge.h"
 
 namespace whi_partial_discharge_sensor
 {
@@ -36,13 +36,15 @@ namespace whi_partial_discharge_sensor
     protected:
         void init();
         void update(const ros::TimerEvent& Event);
-        bool onServiceRead(whi_interfaces::WhiSrvRead::Request& Req, whi_interfaces::WhiSrvRead::Response& Res);
+        bool onServiceRead(whi_interfaces::WhiSrvReadDischarge::Request& Req,
+            whi_interfaces::WhiSrvReadDischarge::Response& Res);
 
     protected:
         std::shared_ptr<ros::NodeHandle> node_handle_{ nullptr };
         std::unique_ptr<ros::Timer> non_realtime_loop_{ nullptr };
         ros::Duration elapsed_time_;
         std::unique_ptr<BaseSensor> sensor_{ nullptr };
+        int read_length_{ 0 };
         std::unique_ptr<ros::ServiceServer> srv_read_{ nullptr };
 	};
 } // namespace whi_partial_discharge_sensor

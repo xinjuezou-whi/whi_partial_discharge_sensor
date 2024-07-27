@@ -15,6 +15,7 @@ All text above must be included in any redistribution.
 
 #include <array>
 #include <iostream>
+#include <cmath>
 
 namespace whi_partial_discharge_sensor
 {
@@ -42,6 +43,14 @@ namespace whi_partial_discharge_sensor
         return crc;
     }
 
+    static float ieee754ToDecimal(uint32_t Raw)
+    {
+        float sign = Raw >> 31 == 0 ? 1.0 : -1.0;
+        uint32_t mantissa = (Raw & 0x7FFFFF) | 0x800000;
+        int32_t exp = ((Raw >> 23) & 0xFF) - 127 - 23;
+        return sign * mantissa * std::pow(2.0, exp);
+    }
+
     SocketSensor::SocketSensor(const std::string& Addr, int Port)
     {
         connector_ = std::make_unique<sockpp::tcp_connector>();
@@ -54,7 +63,7 @@ namespace whi_partial_discharge_sensor
         close();
     }
 
-    std::vector<uint8_t> SocketSensor::readChannel(int Channel)
+    std::vector<uint8_t> SocketSensor::readChannel(int ReadLength, int Channel)
     {
         if (connector_->is_open() && Channel < 3)
         {
@@ -73,15 +82,10 @@ namespace whi_partial_discharge_sensor
             auto rc = connector_->write_n(data.data(), data.size());
             if (rc.value() > 0)
             {
-                uint8_t read[23] = { 0 };
+                uint8_t read[ReadLength] = { 0 };
                 rc = connector_->read_n(read, sizeof(read));
                 if (rc.value() > 0)
                 {
-                    std::vector<uint8_t> resData;
-                    for (const auto& it : read)
-                    {
-                        resData.push_back(it);
-                    }
 #ifdef DEBUG
                     std::cout << "reading data:" << std::endl;
                     for (const auto& it : read)
@@ -90,17 +94,31 @@ namespace whi_partial_discharge_sensor
                     }
                     std::cout << std::dec << " with size " << sizeof(read) << std::endl;
 #endif
+                    crc = crc16(read, ReadLength - 2);
+                    if (uint8_t(crc) == read[ReadLength - 2] && uint8_t(crc >> 8) == read[ReadLength - 1])
+                    {
+                        std::vector<uint8_t> resData;
+                        for (const auto& it : read)
+                        {
+                            resData.push_back(it);
+                        }
 
-                    return resData;
+                        return resData;
+                    }
+                    else
+                    {
+                        printf((std::string(YELLOW) + "[warn]: got mismet crc code\n" + CLEANUP).c_str());
+                        return std::vector<uint8_t>();
+                    }
                 }
                 else
                 {
-                    printf((std::string(LIGHT_RED) + "[error]: failed to read" + CLEANUP).c_str());
+                    printf((std::string(LIGHT_RED) + "[error]: failed to read\n" + CLEANUP).c_str());
                 }
             }
             else
             {
-                printf((std::string(LIGHT_RED) + "[error]: failed to write" + CLEANUP).c_str());
+                printf((std::string(LIGHT_RED) + "[error]: failed to write\n" + CLEANUP).c_str());
             }
         }
         else
@@ -119,12 +137,12 @@ namespace whi_partial_discharge_sensor
         return std::vector<uint8_t>();
     }
 
-    std::map<int, std::vector<uint8_t>> SocketSensor::readChannels()
+    std::map<int, std::vector<uint8_t>> SocketSensor::readChannels(int ReadLength)
     {
         std::map<int, std::vector<uint8_t>> resData;
         for (int i = 0; i < 3; ++i)
         {
-            resData[i] = readChannel(i);
+            resData[i] = readChannel(ReadLength, i);
         }
 
         return resData;
