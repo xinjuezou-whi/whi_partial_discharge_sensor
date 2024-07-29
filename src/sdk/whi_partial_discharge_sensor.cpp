@@ -25,6 +25,21 @@ namespace whi_partial_discharge_sensor
         return sign * mantissa * pow(2.0, exp);
     }
 
+    static std::string toChannelStr(int Channel)
+    {
+        switch (Channel)
+        {
+        case 0:
+            return "TEV";
+        case 1:
+            return "AA";
+        case 2:
+            return "UHF";
+        default:
+            return "undefined";
+        }
+    }
+
     PartialDischarge::PartialDischarge(std::shared_ptr<ros::NodeHandle>& NodeHandle)
         : node_handle_(NodeHandle)
     {
@@ -83,8 +98,8 @@ namespace whi_partial_discharge_sensor
 		elapsed_time_ = ros::Duration(Event.current_real - Event.last_real);
     }
 
-    bool PartialDischarge::onServiceRead(whi_interfaces::WhiSrvReadDischarge::Request& Req,
-        whi_interfaces::WhiSrvReadDischarge::Response& Res)
+    bool PartialDischarge::onServiceRead(whi_interfaces::WhiSrvPartialDischarge::Request& Req,
+        whi_interfaces::WhiSrvPartialDischarge::Response& Res)
     {
         if (sensor_)
         {
@@ -101,7 +116,8 @@ namespace whi_partial_discharge_sensor
 #endif
 
                 std::vector<std::array<float, 7>> translated;
-                for (int i = 3; i < read_length_; i = i + 28)
+                const int step = 7 * sizeof(uint32_t);
+                for (int i = 3; i < read_length_ - 2; i = i + step)
                 {
                     std::array<float, 7> channelTranslated;
                     for (int j = 0; j < channelTranslated.size(); ++j)
@@ -115,7 +131,7 @@ namespace whi_partial_discharge_sensor
                 for (int i = 0; i < translated.size(); ++i)
                 {
                     whi_interfaces::WhiPartialDischarge channel;
-                    channel.channel = uint8_t(i);
+                    channel.channel = toChannelStr(i);
                     channel.peak = translated[i][0];
                     channel.average = translated[i][1];
                     channel.noise = translated[i][2];
