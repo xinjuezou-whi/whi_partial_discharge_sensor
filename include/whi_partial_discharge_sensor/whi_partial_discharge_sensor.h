@@ -46,5 +46,6 @@ namespace whi_partial_discharge_sensor
         std::unique_ptr<BaseSensor> sensor_{ nullptr };
         int read_length_{ 0 };
         std::unique_ptr<ros::ServiceServer> srv_read_{ nullptr };
+        std::unique_ptr<ros::Publisher> pub_line_chart_2D_{ nullptr };
 	};
 } // namespace whi_partial_discharge_sensor

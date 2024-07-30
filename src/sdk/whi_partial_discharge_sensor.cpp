@@ -14,6 +14,7 @@ All text above must be included in any redistribution.
 #include "whi_partial_discharge_sensor/whi_partial_discharge_sensor.h"
 #include "whi_partial_discharge_sensor/sensor_modbus.h"
 #include "whi_partial_discharge_sensor/sensor_socket.h"
+#include "whi_interfaces/WhiLineChart2D.h"
 
 namespace whi_partial_discharge_sensor
 {
@@ -87,6 +88,9 @@ namespace whi_partial_discharge_sensor
         // advertise the read service
         srv_read_ = std::make_unique<ros::ServiceServer>(node_handle_->advertiseService(
             "read_pd", &PartialDischarge::onServiceRead, this));
+        // advertise the msg publisher
+        pub_line_chart_2D_ = std::make_unique<ros::Publisher>(node_handle_->advertise<whi_interfaces::WhiLineChart2D>(
+            "partial_discharge_2D", 50));   
 
         ros::Duration updateFreq = ros::Duration(1.0 / frequency);
 		non_realtime_loop_ = std::make_unique<ros::Timer>(node_handle_->createTimer(
@@ -142,6 +146,30 @@ namespace whi_partial_discharge_sensor
 
                     Res.data.push_back(channel);
                 }
+
+                whi_interfaces::WhiLineChart2D msg;
+                static uint64_t seq = 0;
+                msg.header.stamp = ros::Time::now();
+                msg.header.seq = seq++;
+                for (const auto& it : Res.data)
+                {
+                    whi_interfaces::WhiVectorFloat item;
+                    item.name = it.channel;
+                    item.data.push_back(it.peak);
+                    item.items_name.push_back("peak");
+                    item.items_unit.push_back("mV");
+                    item.data.push_back(it.average);
+                    item.items_name.push_back("average");
+                    item.items_unit.push_back("mV");
+                    item.data.push_back(it.noise);
+                    item.items_name.push_back("noise");
+                    item.items_unit.push_back("mV"); // TODO:: double-check its unit
+                    item.data.push_back(it.phase);
+                    item.items_name.push_back("phase");
+                    item.items_unit.push_back("degree");
+                    msg.array.push_back(item);
+                }
+                pub_line_chart_2D_->publish(msg);
             
                 return true;
             }
